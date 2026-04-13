@@ -1,0 +1,31 @@
+[project]
+name = "stt"
+version = "0.1.0"
+description = "Local speech-to-text REPL for macOS"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "openai-whisper",
+    "numpy",
+    "sounddevice",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+stt = "stt.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
