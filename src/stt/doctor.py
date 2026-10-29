@@ -59,6 +59,15 @@ def run_doctor(
         _fail("whisper package not found")
         missing_dep = True
 
+    if importlib.util.find_spec("mlx_whisper") is not None:
+        _ok("mlx-whisper installed (fast Apple Silicon backend)")
+    else:
+        _warn("mlx-whisper not installed; using slower CPU backend (uv sync --extra mlx)")
+    if importlib.util.find_spec("rumps") is not None and importlib.util.find_spec("Quartz"):
+        _ok("menu-bar app deps installed (stt app)")
+    else:
+        _warn("menu-bar app deps missing (uv sync --extra app)")
+
     try:
         load_config(config_path, strict_model=True)
         _ok("config parses successfully")

@@ -6,7 +6,7 @@ from typing import Any, Optional
 import typer
 
 from stt.config import SttConfig, load_config
-from stt.devices import print_input_devices_report, run_input_meter
+from stt.devices import parse_device_pref, print_input_devices_report, run_input_meter
 from stt.doctor import run_doctor
 from stt.models import list_models, validate_model
 from stt.repl import run_once, run_repl
@@ -143,6 +143,17 @@ def cmd_transcribe(
     print(text, flush=True)
 
 
+@app.command("app")
+def cmd_app(ctx: typer.Context) -> None:
+    """Menu-bar app: hold Option anywhere to dictate, release to paste."""
+    try:
+        from stt.menubar import run_menubar
+    except ImportError as e:
+        eprint(f"error: {e}\nInstall the app extras: uv sync --extra app")
+        raise typer.Exit(1) from e
+    raise typer.Exit(run_menubar(ctx.obj["cfg"]))
+
+
 @app.command("models")
 def cmd_models() -> None:
     for name in list_models():
@@ -167,15 +178,15 @@ def cmd_devices(ctx: typer.Context) -> None:
 def cmd_meter(
     ctx: typer.Context,
     seconds: float = typer.Option(5.0, "--seconds", "-s", help="How long to listen"),
-    device: Optional[int] = typer.Option(
+    device: Optional[str] = typer.Option(
         None,
         "--device",
         "-d",
-        help="Input device index (default: config default_device or system default)",
+        help="Input device index or name substring (default: config default_device, else system input)",
     ),
 ) -> None:
     cfg = ctx.obj["cfg"]
-    dev = device if device is not None else cfg.default_device
+    dev = parse_device_pref(device) if device is not None else cfg.default_device
     code = run_input_meter(
         sample_rate=cfg.sample_rate,
         channels=cfg.channels,

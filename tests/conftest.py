@@ -24,3 +24,16 @@ def temp_config_dir(tmp_path: Path) -> Path:
     d = tmp_path / "config"
     d.mkdir(parents=True)
     return d
+
+
+@pytest.fixture(autouse=True)
+def no_real_clipboard(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Keep tests from overwriting the developer's clipboard; records what would be copied."""
+    copied: list[str] = []
+
+    def fake(text: str) -> None:
+        copied.append(text)
+        return None
+
+    monkeypatch.setattr("stt.repl.copy_to_clipboard", fake)
+    return copied

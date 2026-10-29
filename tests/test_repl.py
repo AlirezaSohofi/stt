@@ -43,6 +43,7 @@ def test_repl_record_stop_transcribe(
     mock_tr: MagicMock,
     mock_rec_class: MagicMock,
     mock_print: MagicMock,
+    no_real_clipboard: list[str],
 ) -> None:
     cfg = SttConfig()
     mock_rec = MagicMock()
@@ -70,6 +71,7 @@ def test_repl_record_stop_transcribe(
     texts = [c.args[0] for c in mock_print.call_args_list if c.args]
     assert "hello world" in texts
     mock_tr_instance.transcribe_array.assert_called_once()
+    assert no_real_clipboard == ["hello world"]
 
 
 @patch("builtins.print")
@@ -103,3 +105,17 @@ def test_repl_stop_keyword_still_works(
     run_repl(cfg, input_fn=scripted_input(["", "stop", "quit"]))
     texts = [c.args[0] for c in mock_print.call_args_list if c.args]
     assert "via stop" in texts
+
+
+@patch("stt.repl.print_input_devices_report")
+def test_repl_mic_command_sets_device(mock_report: MagicMock) -> None:
+    cfg = SttConfig(default_device=3)
+    run_repl(cfg, input_fn=scripted_input(["mic airpods", "mic default", "quit"]))
+    assert cfg.default_device is None
+    assert mock_report.call_args_list[0].args == ("airpods",)
+
+
+def test_repl_clip_toggle() -> None:
+    cfg = SttConfig()
+    run_repl(cfg, input_fn=scripted_input(["clip off", "quit"]))
+    assert cfg.copy_to_clipboard is False

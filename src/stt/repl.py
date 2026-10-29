@@ -7,12 +7,19 @@ from typing import Callable
 import numpy as np
 
 from stt.config import SttConfig
+from stt.devices import parse_device_pref, print_input_devices_report
 from stt.models import validate_model
 from stt.recorder import Recorder
-from stt.sessions import new_session_id, save_session
+from stt.sessions import save_if_enabled
 from stt.state import AppState, StateMachine
 from stt.transcriber import WhisperTranscriber
-from stt.util import audio_sounds_empty, eprint, format_audio_summary, read_line
+from stt.util import (
+    audio_sounds_empty,
+    copy_to_clipboard,
+    eprint,
+    format_audio_summary,
+    read_line,
+)
 
 _QUIT_ALIASES = frozenset({"quit", "exit", "q", "esc", "escape"})
 
@@ -29,6 +36,23 @@ def _report_capture(recorder: Recorder, audio: np.ndarray, cfg: SttConfig) -> No
         eprint(format_audio_summary(audio, cfg.sample_rate))
     if hint:
         eprint(f"warning: {hint}")
+
+
+def _report_mic(recorder: Recorder) -> None:
+    if recorder.device_warning:
+        eprint(f"warning: {recorder.device_warning}")
+    eprint(f"mic: {recorder.device_name}")
+
+
+def _emit_transcript(text: str, cfg: SttConfig, *, verbose: bool) -> None:
+    print(text, flush=True)
+    if not cfg.copy_to_clipboard or not text.strip():
+        return
+    err = copy_to_clipboard(text)
+    if err:
+        eprint(f"warning: could not copy to clipboard: {err}")
+    elif cfg.ui.show_status or verbose:
+        eprint("copied to clipboard")
 
 
 def run_repl(
@@ -102,23 +126,8 @@ def run_repl(
                     continue
                 if debug:
                     eprint(f"debug: transcribe_s={time.perf_counter() - t0:.2f}")
-                print(text, flush=True)
-                if cfg.save_recordings:
-                    sid, created = new_session_id()
-                    try:
-                        save_session(
-                            cfg.sessions_path(),
-                            sid,
-                            created,
-                            audio,
-                            text,
-                            model=transcriber.model_name,
-                            language=cfg.language,
-                            sample_rate=cfg.sample_rate,
-                            channels=cfg.channels,
-                        )
-                    except OSError as e:
-                        eprint(f"error: could not save session: {e}")
+                _emit_transcript(text, cfg, verbose=verbose)
+                save_if_enabled(cfg, audio, text, transcriber.model_name)
                 try:
                     fsm.finish_transcription()
                 except RuntimeError:
@@ -154,6 +163,7 @@ def run_repl(
                     pass
                 eprint(f"error: {e}")
                 continue
+            _report_mic(recorder)
             if cfg.ui.show_status or verbose:
                 eprint("recording started")
             eprint("recording... press Enter (or type 'stop') to finish")
@@ -165,7 +175,8 @@ def run_repl(
         if stripped == "help":
             eprint(
                 "Enter=start, Enter again (or stop)=finish+transcribe, "
-                "model <name>, save on|off, status, q/quit/esc"
+                "model <name>, save on|off, mic [<name>|<index>|default], "
+                "clip on|off, status, q/quit/esc"
             )
             continue
 
@@ -173,7 +184,9 @@ def run_repl(
             eprint(
                 f"model={transcriber.model_name} language={cfg.language} "
                 f"save_recordings={cfg.save_recordings} sample_rate={cfg.sample_rate} "
-                f"channels={cfg.channels} device={cfg.default_device}"
+                f"channels={cfg.channels} "
+                f"mic={cfg.default_device if cfg.default_device is not None else 'system default'} "
+                f"clipboard={cfg.copy_to_clipboard}"
             )
             if debug:
                 eprint(f"debug: config={cfg!r}")
@@ -192,6 +205,23 @@ def run_repl(
             cfg.model = name
             transcriber.set_model(name)
             eprint(f"model set to {name}")
+            continue
+
+        if stripped == "mic" or stripped.startswith("mic "):
+            arg = stripped[3:].strip()
+            if arg:
+                cfg.default_device = parse_device_pref(arg)
+                recorder.device = cfg.default_device
+            print_input_devices_report(cfg.default_device)
+            continue
+
+        if stripped.startswith("clip "):
+            arg = stripped.split(" ", 1)[1].strip().lower()
+            if arg in ("on", "off"):
+                cfg.copy_to_clipboard = arg == "on"
+                eprint(f"copy to clipboard {arg}")
+            else:
+                eprint("error: use 'clip on' or 'clip off'")
             continue
 
         if stripped.startswith("save "):
@@ -222,6 +252,7 @@ def run_once(cfg: SttConfig, *, verbose: bool = False, debug: bool = False) -> i
     except RuntimeError as e:
         eprint(f"error: {e}")
         return 1
+    _report_mic(recorder)
     try:
         while True:
             try:
@@ -251,23 +282,8 @@ def run_once(cfg: SttConfig, *, verbose: bool = False, debug: bool = False) -> i
         except Exception as e:
             eprint(f"error: failed to transcribe audio: {e}")
             return 1
-        print(text, flush=True)
-        if cfg.save_recordings:
-            sid, created = new_session_id()
-            try:
-                save_session(
-                    cfg.sessions_path(),
-                    sid,
-                    created,
-                    audio,
-                    text,
-                    model=transcriber.model_name,
-                    language=cfg.language,
-                    sample_rate=cfg.sample_rate,
-                    channels=cfg.channels,
-                )
-            except OSError as e:
-                eprint(f"error: could not save session: {e}")
+        _emit_transcript(text, cfg, verbose=verbose)
+        save_if_enabled(cfg, audio, text, transcriber.model_name)
         return 0
     finally:
         if recorder.is_recording:

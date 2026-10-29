@@ -22,3 +22,14 @@ def validate_model(name: str) -> None:
 
 def list_models() -> list[str]:
     return list(WHISPER_MODEL_NAMES)
+
+
+# openai-whisper name -> MLX hub repo. Models without an MLX build fall back to openai.
+MLX_REPOS: dict[str, str] = {
+    "tiny": "mlx-community/whisper-tiny-mlx",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large": "mlx-community/whisper-large-v3-mlx",
+    "turbo": "mlx-community/whisper-large-v3-turbo",
+}

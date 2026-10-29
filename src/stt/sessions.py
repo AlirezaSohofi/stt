@@ -6,8 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
+from stt.config import SttConfig
 from stt.types import SessionMetadata
-from stt.util import write_wav
+from stt.util import eprint, write_wav
 
 
 def new_session_id() -> tuple[str, str]:
@@ -59,6 +60,27 @@ def save_session(
         encoding="utf-8",
     )
     return meta
+
+
+def save_if_enabled(cfg: SttConfig, audio: np.ndarray, text: str, model: str) -> None:
+    """Persist one utterance when `save_recordings` is on; failures are reported, not raised."""
+    if not cfg.save_recordings:
+        return
+    sid, created = new_session_id()
+    try:
+        save_session(
+            cfg.sessions_path(),
+            sid,
+            created,
+            audio,
+            text,
+            model=model,
+            language=cfg.language,
+            sample_rate=cfg.sample_rate,
+            channels=cfg.channels,
+        )
+    except OSError as e:
+        eprint(f"error: could not save session: {e}")
 
 
 def ensure_sessions_dir_writable(sessions_root: Path) -> None:

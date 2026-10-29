@@ -35,3 +35,5 @@ build/
 *.7z
 *.iso
 *.dmg
+# private
+docs/

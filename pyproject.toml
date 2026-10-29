@@ -15,6 +15,16 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
 ]
+# Menu-bar app: global hold-Option hotkey, floating HUD, auto-paste.
+app = [
+    "rumps",
+    "pyobjc-framework-Cocoa",
+    "pyobjc-framework-Quartz",
+]
+# Apple Silicon GPU backend (several times faster than CPU openai-whisper).
+mlx = [
+    "mlx-whisper",
+]
 
 [project.scripts]
 stt = "stt.cli:main"

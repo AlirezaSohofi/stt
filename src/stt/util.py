@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 import wave
 from pathlib import Path
@@ -22,6 +23,15 @@ def write_wav(path: Path, audio: np.ndarray, sample_rate: int = 16000) -> None:
 
 def eprint(msg: str) -> None:
     print(msg, file=sys.stderr)
+
+
+def copy_to_clipboard(text: str) -> str | None:
+    """Copy text to the macOS clipboard via pbcopy. Returns an error message, or None on success."""
+    try:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as e:
+        return str(e)
+    return None
 
 
 def read_line(prompt: str = "") -> str:
